@@ -1,0 +1,63 @@
+import pandas as pd
+import numpy as np
+import catboost
+import json
+from sklearn.metrics import mean_absolute_error
+from sklearn.metrics import mean_squared_error
+from sklearn.preprocessing import LabelEncoder, MinMaxScaler
+from sklearn.model_selection import train_test_split
+
+# Step 1: Read the dataset
+data_df = pd.read_csv('data.csv')
+
+# Feature selection (exclude the target variable 'time')
+X = data_df[['Chromosome Number', 'Start Position', 'End Position', 'Block Number', 'Length',
+             'Total Number of Reads', 'Total Quality Score', 'Total Variants',
+             'Sum of Quality Scores * Variants Count', 'Variant Density', 'Coverage', 'Reference Genome']]
+
+y = data_df['time']
+
+# Categorical data encoding
+label_encoder = LabelEncoder()
+X['Chromosome Number'] = label_encoder.fit_transform(X['Chromosome Number'])
+label_encoder_ReferenceGenome = LabelEncoder()
+X['Reference Genome'] = label_encoder_ReferenceGenome.fit_transform(X['Reference Genome'])
+
+# Output the mapping relationship
+mapping = dict(zip(label_encoder.classes_, range(len(label_encoder.classes_))))
+mapping_rg = dict(zip(label_encoder_ReferenceGenome.classes_, range(len(label_encoder_ReferenceGenome.classes_))))
+
+
+# Save the mapping relationship to a file
+with open('label_encoder_mapping.json', 'w', encoding='utf-8') as f:
+    json.dump(mapping, f, ensure_ascii=False, indent=4)
+
+with open('label_encoder_mapping_rg.json', 'w', encoding='utf-8') as f:
+    json.dump(mapping_rg, f, ensure_ascii=False, indent=4)
+
+# Step 2: Split the dataset (90% for training, 10% for testing)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.1, random_state=42)
+y_train = y_train.fillna(0)
+
+# Step 3: Normalize feature data to custom range [-1, 1] (commented out)
+# scaler = MinMaxScaler(feature_range=(-1, 1))
+# X_train_scaled = scaler.fit_transform(X_train)
+# X_test_scaled = scaler.transform(X_test)
+
+
+# Create CatBoost training data format
+train_data = catboost.Pool(X_train, label=y_train)
+
+# Set parameters
+params = {
+    'objective': 'MAE',          # Regression task, using Mean Absolute Error as the objective
+    'learning_rate': 0.10,
+    'depth': 10,                  # Maximum depth of the tree
+    'iterations': 300,            # Number of training iterations
+    'loss_function': 'MAE'       # Mean Absolute Error loss function
+}
+
+# Step 4: Train the model
+model = catboost.CatBoostRegressor(**params)
+model.fit(X_train, y_train)
+model.save_model('catboost_model.cbm')
