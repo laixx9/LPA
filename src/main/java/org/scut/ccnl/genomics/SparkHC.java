@@ -128,6 +128,7 @@ public class SparkHC {
 
         JavaSparkContext jsc = new JavaSparkContext(sparkConf);
         Configuration conf = jsc.hadoopConfiguration();
+        Arguments.THREAD_NUM = jsc.defaultParallelism();
 
         if (Arguments.PARTITION_SIZE > 0) {
             conf.set("mapreduce.input.fileinputformat.split.maxsize", String.valueOf(Arguments.PARTITION_SIZE));
