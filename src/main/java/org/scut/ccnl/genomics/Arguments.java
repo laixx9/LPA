@@ -52,7 +52,7 @@ public class Arguments {
 
     public static volatile int PARTITION_TIME_MAX = 2000;
     public static volatile int PARTITION_TIME_AVG = 200;
-
+    public static volatile int THREAD_NUM = 1;
     public static volatile int WORKER_NUM = 8;
     public static volatile double BASE;
 
