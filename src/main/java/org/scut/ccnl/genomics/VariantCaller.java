@@ -370,33 +370,59 @@ public class VariantCaller {
             Arguments.BASE = base;
         }
         Arguments.BASE = max(percente, base);
-        // entities.sort(Comparator.comparing(PreprocessEntity::getInterval));
-        // for(int j = 0; j < fivePercent; j++){
-        //     priority.add(entities.get(j).getId());
-        // }
+        //任务分配算法
+        int K = Arguments.THREAD_NUM;
+        priority.clear();
 
-        // entities.sort(Comparator.comparing(PreprocessEntity::getRecordNum));
-        // for(int j = 0; j < sevenPercent; j++){
-        //     priority.add(entities.get(j).getId());
-        //}
-//        entities.sort(Comparator.comparing(PreprocessEntity::getCigarI_D));
-//        for(int j = 0; j < eightPercent; j++){
-//            priority.add(entities.get(entitiesSize -1 - j).getId());
-//        }
-//
-//        entities.sort(Comparator.comparing(PreprocessEntity::getInterval));
-//        for(int j = 0; j < eightPercent; j++){
-//            priority.add(entities.get(entitiesSize -1 - j).getId());
-//        }
-//        for(int j = 0; j < fivePercent; j++){
-//            priority.add(entities.get(j).getId());
-//        }
-//
-//        entities.sort(Comparator.comparing(PreprocessEntity::getRecordNum));
-//        for(int j = 0; j < eightPercent; j++){
-//            priority.add(entities.get(j).getId());
-//        }
-        //System.out.println(priority);
+        if (K > 0 && !entities.isEmpty()) {
+            List<PreprocessEntity> sortedTasks = new ArrayList<>(entities);
+            sortedTasks.sort((e1, e2) -> Long.compare(e2.getTime(), e1.getTime()));
+
+            // 最小优先队列：Object[] = [线程编号(Integer), 总负载(Long), 任务列表List<Integer>]
+            PriorityQueue<Object[]> pq = new PriorityQueue<>((arr1, arr2) -> {
+                long load1 = (Long) arr1[1];
+                long load2 = (Long) arr2[1];
+                if (load1 != load2) {
+                    return Long.compare(load1, load2);
+                }
+                int tid1 = (Integer) arr1[0];
+                int tid2 = (Integer) arr2[0];
+                return Integer.compare(tid1, tid2);
+            });
+
+            // 初始化K个线程
+            for (int k = 1; k <= K; k++) {
+                Object[] threadArr = new Object[3];
+                threadArr[0] = k;
+                threadArr[1] = 0L;
+                threadArr[2] = new ArrayList<Integer>();
+                pq.offer(threadArr);
+            }
+
+            // 逐个分配任务
+            for (PreprocessEntity task : sortedTasks) {
+                Object[] minThread = pq.poll();
+                long currLoad = (Long) minThread[1];
+                List<Integer> seq = (List<Integer>) minThread[2];
+
+                seq.add(task.getId());
+                minThread[1] = currLoad + task.getTime();
+                pq.offer(minThread);
+            }
+
+            List<Integer>[] tempAssign = new List[K];
+            while (!pq.isEmpty()) {
+                Object[] node = pq.poll();
+                int tid = (Integer) node[0];
+                List<Integer> taskList = (List<Integer>) node[2];
+                tempAssign[tid - 1] = taskList;
+            }
+
+            for (List<Integer> taskIds : tempAssign) {
+                priority.addAll(taskIds);
+            }
+        }
+        // 将分配后的有序结果存入全局
         Arguments.PARTITIONS_TO_CHANGE = priority;
     }
 
